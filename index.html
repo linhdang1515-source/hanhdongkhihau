@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Climate Actions</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef3f1;--ink:#14302b;--mut:#5d716b;--line:#cbd8d3;--acc:#0b5d4b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Be Vietnam Pro",system-ui,sans-serif}
+h1{font-size:1.6rem;line-height:1.2;margin:0 0 4px}
+h2{font-size:1rem;margin:20px 0 8px}
+.mut{color:var(--mut);margin:0}
+.wrap{max-width:520px;margin:0 auto;padding:24px 16px 56px}
+.who{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.who b{font-weight:600}
+.f{display:block;font-weight:600;margin:20px 0 6px}
+input[type=text],textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
+textarea{min-height:84px;resize:vertical}
+.opts{display:grid;gap:8px}
+.opt{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer}
+.opt:has(input:checked){border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
+.go{width:100%;margin-top:24px;padding:14px;border:0;border-radius:8px;background:var(--acc);color:#fff;font:inherit;font-weight:700;cursor:pointer}
+.go:disabled{opacity:.6}
+.pad{position:relative;aspect-ratio:1;background:#fff;border:1px solid var(--line);border-radius:8px;touch-action:none;cursor:crosshair;
+ background-image:linear-gradient(var(--line),var(--line)),linear-gradient(var(--line),var(--line));background-size:1px 100%,100% 1px;background-position:50% 0,0 50%;background-repeat:no-repeat}
+.pad span{position:absolute;font-size:.78rem;color:var(--mut);pointer-events:none}
+.pad .dot{display:none;width:22px;height:22px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px var(--ink);transform:translate(-50%,-50%);pointer-events:none}
+.msg{margin:14px 0 0;font-weight:600}
+.err{color:#a3281f}.ok{color:var(--acc)}
+.scr{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;height:100vh;padding:16px 20px}
+.chart svg{width:100%;height:100%;display:block}
+.chart svg text{font-family:inherit;fill:var(--mut);font-size:15px}
+.chart svg text.q{font-size:19px;font-weight:600;fill:#9db1aa}
+.side{overflow:auto;padding-right:4px}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:.9rem}
+.legend div,.feed div,.key div{display:flex;align-items:center;gap:8px;min-width:0}
+.legend span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sw{flex:none;width:14px;height:14px;border-radius:50%}
+.feed{display:grid;gap:8px;font-size:.92rem}
+.feed small{display:block;color:var(--mut)}
+.key{display:grid;gap:4px;font-size:.88rem}
+#qr{display:inline-block;background:#fff;padding:8px;border-radius:8px;line-height:0}
+.join{font-size:.82rem;color:var(--mut);word-break:break-all;margin:6px 0 0}
+.pop{transform-box:fill-box;transform-origin:center;animation:pop .6s ease-out}
+@keyframes pop{0%{transform:scale(0)}60%{transform:scale(1.5)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.pop{animation:none}}
+@media (max-width:900px){.scr{grid-template-columns:1fr;height:auto}.chart{aspect-ratio:1}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+// ====== CẤU HÌNH: dán Project URL và anon/publishable key của Supabase ======
+const CFG={url:"https://xoulvarzgttrpswylbft.supabase.co",key:"sb_publishable_3h-uqrAWRRlS0gCmzN7yeA_DgHTKnmL"};
+// ===========================================================================
+
+const P=new URLSearchParams(location.search);
+const EVENT=(P.get('e')||'climate-'+new Date().getFullYear()).toLowerCase().replace(/[^a-z0-9-]/g,'')||'climate';
+const SCREEN=P.get('view')==='screen';
+const app=document.getElementById('app');
+const $=(t,a={},...c)=>{const e=document.createElement(t);for(const k in a){if(k==='class')e.className=a[k];else if(k.startsWith('on'))e.addEventListener(k.slice(2),a[k]);else e.setAttribute(k,a[k])}c.flat().forEach(x=>e.append(x));return e};
+const NS='http://www.w3.org/2000/svg';
+const S=(t,a={},...c)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);c.forEach(x=>e.append(x));return e};
+const color=i=>`hsl(${(i*137.508)%360} ${[72,62,80][i%3]}% ${[46,56,38][i%3]}%)`;
+const KIND={mitigation:'Giảm thiểu (Mitigation)',adaptation:'Thích ứng (Adaptation)',both:'Cả hai'};
+const SCOPE={local:'Cá nhân / nhóm nhỏ (gia đình, công ty)',global:'Quốc gia / toàn cầu'};
+const clamp=v=>Math.max(0,Math.min(1,v));
+
+function mk(kind,r,fill){
+  const a={fill,stroke:'#fff','stroke-width':2};
+  if(kind==='adaptation')return S('rect',{...a,x:-r,y:-r,width:2*r,height:2*r,rx:2});
+  if(kind==='both'){const d=r*1.3;return S('polygon',{...a,points:`0,${-d} ${d},0 0,${d} ${-d},0`})}
+  return S('circle',{...a,r});
+}
+function icon(kind,fill,r=8){const s=S('svg',{viewBox:'-16 -16 32 32',width:22,height:22});s.append(mk(kind,r,fill));return s}
+
+const hasCfg=!CFG.url.startsWith('PASTE');
+const db=hasCfg?supabase.createClient(CFG.url,CFG.key):null;
+if(!hasCfg)app.append($('div',{class:'wrap'},$('h1',{},'Chưa kết nối cơ sở dữ liệu'),$('p',{class:'mut'},'Mở index.html và dán Project URL cùng key của Supabase vào phần CẤU HÌNH.')));
+else SCREEN?screenView():playView();
+
+/* ---------- Người chơi ---------- */
+async function join(name){
+  for(let t=0;t<6;t++){
+    const {data:m}=await db.from('participants').select('color_idx').eq('event',EVENT).order('color_idx',{ascending:false}).limit(1);
+    const idx=m&&m.length?m[0].color_idx+1:0;
+    const {data,error}=await db.from('participants').insert({event:EVENT,name,color_idx:idx}).select().single();
+    if(!error)return data;
+    if(error.code!=='23505')throw error; // 23505 = trùng màu do hai người vào cùng lúc, thử lại
+  }
+  throw new Error('busy');
+}
+
+function playView(){
+  const KEY='ca:'+EVENT;
+  let me=null;try{me=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
+  let sent=0;
+  const root=$('div',{class:'wrap'});app.append(root);
+  const intro=()=>{
+    const name=$('input',{type:'text',maxlength:40,placeholder:'Tên của bạn',required:'',autocomplete:'name'});
+    const msg=$('p',{class:'msg err'});
+    const btn=$('button',{class:'go',type:'submit'},'Tham gia');
+    root.replaceChildren($('h1',{},'Climate Actions'),
+      $('p',{class:'mut'},'Chia sẻ các hành động vì khí hậu và tự xếp chúng lên biểu đồ chung của cả nhóm.'),
+      $('form',{onsubmit:async e=>{e.preventDefault();const v=name.value.trim();if(!v)return;btn.disabled=true;msg.textContent='';
+        try{me=await join(v);try{localStorage.setItem(KEY,JSON.stringify(me))}catch(x){}form()}
+        catch(x){msg.textContent='Chưa tham gia được. Kiểm tra mạng rồi thử lại.';btn.disabled=false}}},
+        $('label',{class:'f'},'Tên hiển thị trên màn hình chiếu'),name,btn,msg));
+  };
+  const form=()=>{
+    let pos=null,drag=false;
+    const dot=$('i',{class:'dot'});dot.style.background=color(me.color_idx);
+    const pad=$('div',{class:'pad'},dot,
+      $('span',{style:'left:8px;top:6px'},'Tác động cao'),$('span',{style:'left:8px;bottom:6px'},'Tác động thấp'));
+    const padRow=$('div',{style:'display:flex;justify-content:space-between;font-size:.78rem;color:var(--mut);margin-top:4px'},$('span',{},'Dễ làm'),$('span',{},'Khó làm'));
+    const set=e=>{const r=pad.getBoundingClientRect(),x=clamp((e.clientX-r.left)/r.width),y=clamp((e.clientY-r.top)/r.height);
+      pos={effort:Math.round(x*100),impact:Math.round((1-y)*100)};dot.style.display='block';dot.style.left=x*100+'%';dot.style.top=y*100+'%'};
+    pad.addEventListener('pointerdown',e=>{pad.setPointerCapture(e.pointerId);drag=true;set(e)});
+    pad.addEventListener('pointermove',e=>{if(drag)set(e)});
+    pad.addEventListener('pointerup',()=>drag=false);
+    const text=$('textarea',{maxlength:200,required:'',placeholder:'Ví dụ: Mang bình nước cá nhân thay chai nhựa'});
+    const radios=(name,obj)=>$('div',{class:'opts'},Object.entries(obj).map(([v,l])=>$('label',{class:'opt'},$('input',{type:'radio',name,value:v,required:''}),l)));
+    const msg=$('p',{class:'msg'});const btn=$('button',{class:'go',type:'submit'},'Gửi ý tưởng');
+    const f=$('form',{onsubmit:async e=>{e.preventDefault();msg.className='msg err';
+      if(!pos){msg.textContent='Chạm vào ô vuông để đặt vị trí cho ý tưởng.';return}
+      const fd=new FormData(f);btn.disabled=true;
+      const {error}=await db.from('ideas').insert({event:EVENT,participant_id:me.id,text:text.value.trim(),impact:pos.impact,effort:pos.effort,kind:fd.get('kind'),scope:fd.get('scope')});
+      btn.disabled=false;
+      if(error){msg.textContent='Chưa gửi được. Thử lại nhé.';return}
+      sent++;f.reset();pos=null;dot.style.display='none';msg.className='msg ok';msg.textContent=`Đã gửi ${sent} ý tưởng. Bạn có thể thêm ý tưởng khác.`}},
+      $('label',{class:'f'},'Hành động của bạn'),text,
+      $('label',{class:'f'},'Đặt vị trí: ngang là độ khó, dọc là mức tác động'),pad,padRow,
+      $('label',{class:'f'},'Loại hành động'),radios('kind',KIND),
+      $('label',{class:'f'},'Quy mô'),radios('scope',SCOPE),btn,msg);
+    root.replaceChildren($('div',{class:'who'},$('i',{class:'sw',style:`background:${color(me.color_idx)}`}),$('b',{},me.name)),
+      $('p',{class:'mut'},'Màu này là của bạn trên màn hình chiếu.'),f);
+  };
+  me?form():intro();
+}
+
+/* ---------- Màn hình trình chiếu ---------- */
+function screenView(){
+  let parts=[],ideas=[];const seen=new Set();
+  app.className='scr';
+  const chart=$('div',{class:'chart'}),side=$('div',{class:'side'});app.append(chart,side);
+  const qr=$('div',{id:'qr'}),joinUrl=location.origin+location.pathname+'?e='+EVENT;
+  try{new QRCode(qr,{text:joinUrl,width:140,height:140})}catch(e){qr.textContent=''}
+  const status=$('p',{class:'msg err'});
+
+  const hs=s=>{let x=0;for(let i=0;i<s.length;i++)x=(x*31+s.charCodeAt(i))|0;return x};
+  const jit=(id,k)=>((Math.abs(hs(id+k))%100)/100-.5)*16;
+
+  function drawChart(){
+    const by=new Map(parts.map(p=>[p.id,p]));
+    const X0=70,X1=620,Y0=20,Y1=540,mx=(X0+X1)/2,my=(Y0+Y1)/2;
+    const px=v=>X0+v/100*(X1-X0),py=v=>Y1-v/100*(Y1-Y0);
+    const T=(t,a)=>{const e=S('text',a);e.textContent=t;return e};
+    const g=S('svg',{viewBox:'0 0 640 600',role:'img','aria-label':'Biểu đồ hành động khí hậu'},
+      S('rect',{x:X0,y:Y0,width:X1-X0,height:Y1-Y0,fill:'#fff',stroke:'#cbd8d3'}),
+      S('line',{x1:mx,y1:Y0,x2:mx,y2:Y1,stroke:'#cbd8d3','stroke-dasharray':'4 4'}),
+      S('line',{x1:X0,y1:my,x2:X1,y2:my,stroke:'#cbd8d3','stroke-dasharray':'4 4'}),
+      T('Làm ngay',{x:X0+12,y:Y0+28,class:'q'}),
+      T('Đầu tư dài hạn',{x:X1-12,y:Y0+28,class:'q','text-anchor':'end'}),
+      T('Việc nhỏ, dễ làm',{x:X0+12,y:Y1-14,class:'q'}),
+      T('Cân nhắc lại',{x:X1-12,y:Y1-14,class:'q','text-anchor':'end'}),
+      T('Dễ làm',{x:X0,y:Y1+26}),T('Khó làm',{x:X1,y:Y1+26,'text-anchor':'end'}),
+      T('Mức độ khó làm',{x:mx,y:Y1+26,'text-anchor':'middle'}),
+      T('Tác động thấp',{transform:`translate(34,${Y1}) rotate(-90)`}),
+      T('Tác động cao',{transform:`translate(34,${Y0}) rotate(-90)`,'text-anchor':'end'}),
+      T('Mức tác động',{transform:`translate(34,${my}) rotate(-90)`,'text-anchor':'middle'}));
+    ideas.forEach(i=>{
+      const p=by.get(i.participant_id),fill=p?color(p.color_idx):'#999';
+      const x=px(i.effort)+jit(i.id,'x'),y=py(i.impact)+jit(i.id,'y');
+      const shape=mk(i.kind,i.scope==='global'?13:8,fill);
+      if(!seen.has(i.id))shape.setAttribute('class','pop');
+      const ttl=S('title');ttl.textContent=`${i.text} (${p?p.name:''})`;
+      g.append(S('g',{transform:`translate(${x},${y})`},shape,ttl));
+    });
+    chart.replaceChildren(g);
+  }
+
+  function drawSide(){
+    const legend=$('div',{class:'legend'},parts.map(p=>$('div',{},$('i',{class:'sw',style:`background:${color(p.color_idx)}`}),$('span',{title:p.name},p.name))));
+    const by=new Map(parts.map(p=>[p.id,p]));
+    const feed=$('div',{class:'feed'},ideas.slice(-6).reverse().map(i=>{const p=by.get(i.participant_id);
+      return $('div',{},icon(i.kind,p?color(p.color_idx):'#999'),$('div',{style:'display:block'},i.text,$('small',{},p?p.name:'')))}));
+    const key=$('div',{class:'key'},
+      $('div',{},icon('mitigation','#5d716b'),'Giảm thiểu (Mitigation)'),
+      $('div',{},icon('adaptation','#5d716b'),'Thích ứng (Adaptation)'),
+      $('div',{},icon('both','#5d716b'),'Cả hai'),
+      $('div',{},icon('mitigation','#5d716b',6),'Điểm nhỏ: cá nhân / nhóm nhỏ'),
+      $('div',{},icon('mitigation','#5d716b',12),'Điểm lớn: quốc gia / toàn cầu'));
+    side.replaceChildren($('h1',{},'Climate Actions'),
+      $('p',{class:'mut'},`${ideas.length} ý tưởng từ ${parts.length} người`),status,
+      $('h2',{},'Quét mã để tham gia'),qr,$('p',{class:'join'},joinUrl),
+      $('h2',{},'Người tham gia'),legend,$('h2',{},'Cách đọc biểu đồ'),key,
+      $('h2',{},'Ý tưởng mới nhất'),feed);
+  }
+  function draw(){drawChart();drawSide();ideas.forEach(i=>seen.add(i.id))}
+
+  async function load(){
+    const [a,b]=await Promise.all([
+      db.from('participants').select('*').eq('event',EVENT).order('color_idx'),
+      db.from('ideas').select('*').eq('event',EVENT).order('created_at')]);
+    if(a.error||b.error){status.textContent='Mất kết nối, đang thử lại...';return}
+    status.textContent='';parts=a.data;ideas=b.data;draw();
+  }
+  load();
+  db.channel('ca-'+EVENT)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'participants',filter:'event=eq.'+EVENT},p=>{if(!parts.some(x=>x.id===p.new.id)){parts.push(p.new);draw()}})
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'ideas',filter:'event=eq.'+EVENT},p=>{if(!ideas.some(x=>x.id===p.new.id)){ideas.push(p.new);draw()}})
+    .subscribe();
+  setInterval(load,20000); // dự phòng khi mạng chặn kết nối realtime
+}
+</script>
+</body>
+</html>

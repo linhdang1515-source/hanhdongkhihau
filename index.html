@@ -47,6 +47,36 @@ textarea{min-height:84px;resize:vertical}
 @keyframes pop{0%{transform:scale(0)}60%{transform:scale(1.5)}100%{transform:scale(1)}}
 @media (prefers-reduced-motion:reduce){.pop{animation:none}}
 @media (max-width:900px){.scr{grid-template-columns:1fr;height:auto}.chart{aspect-ratio:1}}
+
+body{background:linear-gradient(160deg,#f6fbf8,#e9f2fb);background-attachment:fixed}
+.pad span{max-width:44%;line-height:1.25}
+.scr{grid-template-columns:minmax(0,1fr) 300px;gap:18px;height:100vh;padding:18px 22px}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:12px}
+.tabs{display:flex;gap:4px;background:#fff;padding:4px;border-radius:999px;box-shadow:0 1px 5px #0b2a4a1f}
+.tab{border:0;background:transparent;padding:8px 20px;border-radius:999px;font:inherit;font-weight:600;color:var(--mut);cursor:pointer}
+.tab.on{background:var(--acc);color:#fff}
+.stage{flex:1;min-height:0;overflow:auto;padding:2px}
+.chartbox{height:100%;background:#fff;border-radius:16px;box-shadow:0 1px 6px #0b2a4a14;padding:8px}
+.chartbox svg{width:100%;height:100%;display:block}
+.chartbox svg text{font-family:inherit;fill:var(--mut);font-size:15px}
+.chartbox svg text.q{font-size:19px;font-weight:600;fill:#9db1aa}
+.tbl{display:grid;grid-template-columns:150px repeat(3,minmax(0,1fr));gap:8px;min-width:640px}
+.th{padding:12px 14px;border-radius:12px;display:flex;flex-direction:column;justify-content:center;font-size:1.05rem}
+.th small{font-weight:400;font-size:.78rem;opacity:.92}
+.th.corner{background:#fff;color:var(--mut);font-weight:600;font-size:.9rem;box-shadow:0 1px 5px #0b2a4a14}
+.rh{padding:12px 14px;border-radius:12px;font-weight:700;display:flex;align-items:center;min-height:110px;line-height:1.3}
+.cell{border-radius:12px;padding:8px;display:grid;gap:6px;align-content:start;min-height:110px}
+.chip{display:flex;gap:8px;align-items:flex-start;padding:7px 10px;border-radius:10px;border-left:6px solid;font-size:.95rem;line-height:1.35;box-shadow:0 1px 2px #0b2a4a14}
+.bd{flex:none;font-size:.7rem;font-weight:700;background:var(--ink);color:#fff;border-radius:6px;padding:1px 6px;margin-top:2px;white-space:nowrap}
+.chip.new{animation:chipin .6s ease-out}
+@keyframes chipin{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.chip.new{animation:none}}
+.card{background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 6px #0b2a4a14;margin-bottom:12px}
+.card h2{margin:0 0 8px;font-size:.95rem}
+.legend{grid-template-columns:1fr;max-height:32vh;overflow:auto;font-size:.92rem}
+.key{gap:6px}
+@media (max-width:900px){.scr{grid-template-columns:1fr;height:auto}.stage{overflow:visible}.tbl{overflow:auto}.chartbox{height:auto;aspect-ratio:1}}
 </style>
 </head>
 <body>
@@ -67,7 +97,7 @@ const NS='http://www.w3.org/2000/svg';
 const S=(t,a={},...c)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);c.forEach(x=>e.append(x));return e};
 const color=i=>`hsl(${(i*137.508)%360} ${[72,62,80][i%3]}% ${[46,56,38][i%3]}%)`;
 const KIND={mitigation:'Giảm thiểu (Mitigation)',adaptation:'Thích ứng (Adaptation)',both:'Cả hai'};
-const SCOPE={local:'Cá nhân / nhóm nhỏ (gia đình, công ty)',global:'Quốc gia / toàn cầu'};
+const SCOPE={individual:'Cá nhân',group:'Nhóm nhỏ (gia đình, công ty, bạn bè)',global:'Quốc gia / Quốc tế'};
 const clamp=v=>Math.max(0,Math.min(1,v));
 
 function mk(kind,r,fill){
@@ -115,7 +145,8 @@ function playView(){
     let pos=null,drag=false;
     const dot=$('i',{class:'dot'});dot.style.background=color(me.color_idx);
     const pad=$('div',{class:'pad'},dot,
-      $('span',{style:'left:8px;top:6px'},'Tác động cao'),$('span',{style:'left:8px;bottom:6px'},'Tác động thấp'));
+      $('span',{style:'left:8px;top:6px'},'Dễ làm · Tác động CAO'),$('span',{style:'right:8px;top:6px;text-align:right'},'KHÓ làm · Tác động CAO'),
+      $('span',{style:'left:8px;bottom:6px'},'Dễ làm · Tác động thấp'),$('span',{style:'right:8px;bottom:6px;text-align:right'},'Khó làm · Tác động thấp'));
     const padRow=$('div',{style:'display:flex;justify-content:space-between;font-size:.78rem;color:var(--mut);margin-top:4px'},$('span',{},'Dễ làm'),$('span',{},'Khó làm'));
     const set=e=>{const r=pad.getBoundingClientRect(),x=clamp((e.clientX-r.left)/r.width),y=clamp((e.clientY-r.top)/r.height);
       pos={effort:Math.round(x*100),impact:Math.round((1-y)*100)};dot.style.display='block';dot.style.left=x*100+'%';dot.style.top=y*100+'%'};
@@ -133,7 +164,7 @@ function playView(){
       if(error){msg.textContent='Chưa gửi được. Thử lại nhé.';return}
       sent++;f.reset();pos=null;dot.style.display='none';msg.className='msg ok';msg.textContent=`Đã gửi ${sent} ý tưởng. Bạn có thể thêm ý tưởng khác.`}},
       $('label',{class:'f'},'Hành động của bạn'),text,
-      $('label',{class:'f'},'Đặt vị trí: ngang là độ khó, dọc là mức tác động'),pad,padRow,
+      $('label',{class:'f'},'Đặt vị trí: ngang là độ khó, dọc là mức tác động (chạm vào ô vuông)'),pad,padRow,
       $('label',{class:'f'},'Loại hành động'),radios('kind',KIND),
       $('label',{class:'f'},'Quy mô'),radios('scope',SCOPE),btn,msg);
     root.replaceChildren($('div',{class:'who'},$('i',{class:'sw',style:`background:${color(me.color_idx)}`}),$('b',{},me.name)),
@@ -143,19 +174,44 @@ function playView(){
 }
 
 /* ---------- Màn hình trình chiếu ---------- */
+const SCOL={individual:0,group:1,global:2,local:0};
+const ROWS=[{t:'Dễ làm - Tác động thấp',c:'#fde8d7'},{t:'Dễ làm - Tác động CAO',c:'#d6efd4'},{t:'KHÓ làm - Tác động CAO',c:'#f8d3d3'},{t:'Khó làm - Tác động thấp',c:'#e4e9e7'}];
+const COLS=[{t:'Cá nhân',bg:'#8fbdf2',fg:'#0b2a4a'},{t:'Nhóm nhỏ',s:'(gia đình, công ty, bạn bè)',bg:'#2f6fd6',fg:'#fff'},{t:'Quốc gia / Quốc tế',bg:'#0f3560',fg:'#fff'}];
+const BADGE={mitigation:'M',adaptation:'A',both:'M+A'};
+const colorA=(i,a)=>color(i).replace(/\)$/,` / ${a})`);
+const rowOf=i=>i.effort<50?(i.impact>=50?1:0):(i.impact>=50?2:3);
+
 function screenView(){
-  let parts=[],ideas=[];const seen=new Set();
+  let parts=[],ideas=[],mode='table';const seen=new Set();
   app.className='scr';
-  const chart=$('div',{class:'chart'}),side=$('div',{class:'side'});app.append(chart,side);
   const qr=$('div',{id:'qr'}),joinUrl=location.origin+location.pathname+'?e='+EVENT;
-  try{new QRCode(qr,{text:joinUrl,width:140,height:140})}catch(e){qr.textContent=''}
-  const status=$('p',{class:'msg err'});
+  try{new QRCode(qr,{text:joinUrl,width:120,height:120})}catch(e){}
+  const status=$('p',{class:'msg err'}),count=$('p',{class:'mut'}),stage=$('div',{class:'stage'});
+  const tabs=[['table','Bảng'],['chart','Biểu đồ']].map(([m,l])=>$('button',{class:'tab',type:'button',onclick:()=>{mode=m;draw()}},l));
+  const side=$('div',{class:'side'});
+  app.append($('div',{class:'main'},$('div',{class:'head'},$('div',{},$('h1',{},'Climate Actions'),count,status),$('div',{class:'tabs'},tabs)),stage),side);
 
   const hs=s=>{let x=0;for(let i=0;i<s.length;i++)x=(x*31+s.charCodeAt(i))|0;return x};
   const jit=(id,k)=>((Math.abs(hs(id+k))%100)/100-.5)*16;
+  const byId=()=>new Map(parts.map(p=>[p.id,p]));
+
+  function drawTable(){
+    const by=byId();
+    const chip=i=>{const p=by.get(i.participant_id),k=p?p.color_idx:0;
+      return $('div',{class:'chip'+(seen.has(i.id)?'':' new'),title:p?p.name:'',style:`border-left-color:${p?color(k):'#999'};background:${p?colorA(k,.16):'#eee'}`},
+        $('span',{class:'bd'},BADGE[i.kind]||''),$('span',{},i.text))};
+    const grid=$('div',{class:'tbl'},$('div',{class:'th corner'},'Danh mục hành động'));
+    COLS.forEach(c=>grid.append($('div',{class:'th',style:`background:${c.bg};color:${c.fg}`},$('b',{},c.t),c.s?$('small',{},c.s):'')));
+    ROWS.forEach((r,ri)=>{
+      grid.append($('div',{class:'rh',style:`background:${r.c}`},r.t));
+      [0,1,2].forEach(ci=>grid.append($('div',{class:'cell',style:`background:${r.c}66`},
+        ideas.filter(i=>rowOf(i)===ri&&SCOL[i.scope]===ci).map(chip))));
+    });
+    return grid;
+  }
 
   function drawChart(){
-    const by=new Map(parts.map(p=>[p.id,p]));
+    const by=byId();
     const X0=70,X1=620,Y0=20,Y1=540,mx=(X0+X1)/2,my=(Y0+Y1)/2;
     const px=v=>X0+v/100*(X1-X0),py=v=>Y1-v/100*(Y1-Y0);
     const T=(t,a)=>{const e=S('text',a);e.textContent=t;return e};
@@ -163,44 +219,42 @@ function screenView(){
       S('rect',{x:X0,y:Y0,width:X1-X0,height:Y1-Y0,fill:'#fff',stroke:'#cbd8d3'}),
       S('line',{x1:mx,y1:Y0,x2:mx,y2:Y1,stroke:'#cbd8d3','stroke-dasharray':'4 4'}),
       S('line',{x1:X0,y1:my,x2:X1,y2:my,stroke:'#cbd8d3','stroke-dasharray':'4 4'}),
-      T('Làm ngay',{x:X0+12,y:Y0+28,class:'q'}),
-      T('Đầu tư dài hạn',{x:X1-12,y:Y0+28,class:'q','text-anchor':'end'}),
-      T('Việc nhỏ, dễ làm',{x:X0+12,y:Y1-14,class:'q'}),
-      T('Cân nhắc lại',{x:X1-12,y:Y1-14,class:'q','text-anchor':'end'}),
-      T('Dễ làm',{x:X0,y:Y1+26}),T('Khó làm',{x:X1,y:Y1+26,'text-anchor':'end'}),
-      T('Mức độ khó làm',{x:mx,y:Y1+26,'text-anchor':'middle'}),
-      T('Tác động thấp',{transform:`translate(34,${Y1}) rotate(-90)`}),
-      T('Tác động cao',{transform:`translate(34,${Y0}) rotate(-90)`,'text-anchor':'end'}),
+      T('Làm ngay',{x:X0+12,y:Y0+28,class:'q'}),T('Đầu tư dài hạn',{x:X1-12,y:Y0+28,class:'q','text-anchor':'end'}),
+      T('Việc nhỏ, dễ làm',{x:X0+12,y:Y1-14,class:'q'}),T('Cân nhắc lại',{x:X1-12,y:Y1-14,class:'q','text-anchor':'end'}),
+      T('Dễ làm',{x:X0,y:Y1+26}),T('Khó làm',{x:X1,y:Y1+26,'text-anchor':'end'}),T('Mức độ khó làm',{x:mx,y:Y1+26,'text-anchor':'middle'}),
+      T('Tác động thấp',{transform:`translate(34,${Y1}) rotate(-90)`}),T('Tác động cao',{transform:`translate(34,${Y0}) rotate(-90)`,'text-anchor':'end'}),
       T('Mức tác động',{transform:`translate(34,${my}) rotate(-90)`,'text-anchor':'middle'}));
+    const R={0:7,1:10,2:14};
     ideas.forEach(i=>{
-      const p=by.get(i.participant_id),fill=p?color(p.color_idx):'#999';
-      const x=px(i.effort)+jit(i.id,'x'),y=py(i.impact)+jit(i.id,'y');
-      const shape=mk(i.kind,i.scope==='global'?13:8,fill);
+      const p=by.get(i.participant_id);
+      const shape=mk(i.kind,R[SCOL[i.scope]]||8,p?color(p.color_idx):'#999');
       if(!seen.has(i.id))shape.setAttribute('class','pop');
       const ttl=S('title');ttl.textContent=`${i.text} (${p?p.name:''})`;
-      g.append(S('g',{transform:`translate(${x},${y})`},shape,ttl));
+      g.append(S('g',{transform:`translate(${px(i.effort)+jit(i.id,'x')},${py(i.impact)+jit(i.id,'y')})`},shape,ttl));
     });
-    chart.replaceChildren(g);
+    return $('div',{class:'chartbox'},g);
   }
 
   function drawSide(){
     const legend=$('div',{class:'legend'},parts.map(p=>$('div',{},$('i',{class:'sw',style:`background:${color(p.color_idx)}`}),$('span',{title:p.name},p.name))));
-    const by=new Map(parts.map(p=>[p.id,p]));
-    const feed=$('div',{class:'feed'},ideas.slice(-6).reverse().map(i=>{const p=by.get(i.participant_id);
-      return $('div',{},icon(i.kind,p?color(p.color_idx):'#999'),$('div',{style:'display:block'},i.text,$('small',{},p?p.name:'')))}));
-    const key=$('div',{class:'key'},
-      $('div',{},icon('mitigation','#5d716b'),'Giảm thiểu (Mitigation)'),
-      $('div',{},icon('adaptation','#5d716b'),'Thích ứng (Adaptation)'),
-      $('div',{},icon('both','#5d716b'),'Cả hai'),
-      $('div',{},icon('mitigation','#5d716b',6),'Điểm nhỏ: cá nhân / nhóm nhỏ'),
-      $('div',{},icon('mitigation','#5d716b',12),'Điểm lớn: quốc gia / toàn cầu'));
-    side.replaceChildren($('h1',{},'Climate Actions'),
-      $('p',{class:'mut'},`${ideas.length} ý tưởng từ ${parts.length} người`),status,
-      $('h2',{},'Quét mã để tham gia'),qr,$('p',{class:'join'},joinUrl),
-      $('h2',{},'Người tham gia'),legend,$('h2',{},'Cách đọc biểu đồ'),key,
-      $('h2',{},'Ý tưởng mới nhất'),feed);
+    const key=mode==='table'
+      ?$('div',{class:'key'},['mitigation','adaptation','both'].map(k=>$('div',{},$('span',{class:'bd'},BADGE[k]),KIND[k])),
+         $('div',{style:'color:var(--mut)'},'Màu của ô ý tưởng là màu của người đã gửi.'))
+      :$('div',{class:'key'},$('div',{},icon('mitigation','#5d716b'),'Giảm thiểu (Mitigation)'),$('div',{},icon('adaptation','#5d716b'),'Thích ứng (Adaptation)'),$('div',{},icon('both','#5d716b'),'Cả hai'),
+         $('div',{},icon('mitigation','#5d716b',6),'Điểm nhỏ: cá nhân'),$('div',{},icon('mitigation','#5d716b',9),'Điểm vừa: nhóm nhỏ'),$('div',{},icon('mitigation','#5d716b',13),'Điểm lớn: quốc gia / quốc tế'));
+    side.replaceChildren(
+      $('div',{class:'card'},$('h2',{},'Quét mã để tham gia'),qr,$('p',{class:'join'},joinUrl)),
+      $('div',{class:'card'},$('h2',{},'Màu của từng người'),legend),
+      $('div',{class:'card'},$('h2',{},'Ký hiệu'),key));
   }
-  function draw(){drawChart();drawSide();ideas.forEach(i=>seen.add(i.id))}
+
+  function draw(){
+    count.textContent=`${ideas.length} ý tưởng từ ${parts.length} người`;
+    tabs.forEach((t,i)=>t.classList.toggle('on',['table','chart'][i]===mode));
+    const top=stage.scrollTop;
+    stage.replaceChildren(mode==='table'?drawTable():drawChart());stage.scrollTop=top;
+    drawSide();ideas.forEach(i=>seen.add(i.id));
+  }
 
   async function load(){
     const [a,b]=await Promise.all([
